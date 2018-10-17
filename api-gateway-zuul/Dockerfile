@@ -1,4 +1,4 @@
-FROM openjdk:8-jre
+FROM hub.nnkwrik.com/micro-service/openjdk:8-jre
 MAINTAINER nnkwrik nnkwrik@gmail.com
 
 COPY target/api-gateway-zuul-1.0-SNAPSHOT.jar /api-gateway-zuul.jar

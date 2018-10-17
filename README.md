@@ -81,7 +81,8 @@ docker-compose up -d message-service // 重启某个服务
 docker-compose down
 ```
 ## 镜像仓库
-公有仓库
+### 公有仓库
+
 ```bash
 docker tag zookeeper:3.5  nnkwrik/zookeeper:3.5
 docker login
@@ -89,7 +90,7 @@ docker push nnkwrik/zookeeper:3.5
 docker pull nnkwrik/zookeeper:3.5
 ```
 
-私有仓库
+### 私有仓库
 
 没有交互界面, 多台生产环境时不容易管理
 ```bash
@@ -100,9 +101,22 @@ docker push localhost:5000/zookeeper:3.5
 docker pull localhost:5000/zookeeper:3.5
 ```
 
-harbor
+### harbor
 
 改harbor.cfg,后 `sudo ./install.sh`
 ```bash
 hostname = hub.nnkwrik.com
 ```
+
+/etc/hosts中添加
+
+```
+127.0.0.1		hub.nnkwrik.com
+```
+
+```
+docker login hub.nnkwrik.com
+docker tag openjdk:8-jre   hub.nnkwrik.co/micro-service/openjdk:8-jre
+docker push hub.nnkwrik.com/micro-service/openjdk:8-jre
+```
+

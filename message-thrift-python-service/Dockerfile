@@ -1,4 +1,4 @@
-FROM python-base:latest
+FROM hub.nnkwrik.com/micro-service/python-base:latest
 MAINTAINER nnkwrik nnkwrik@gmail.com
 
 ENV PYTHONPATH /
