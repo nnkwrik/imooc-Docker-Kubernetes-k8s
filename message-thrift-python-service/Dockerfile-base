@@ -1,5 +1,5 @@
 # 先搭一个安装了thrift的python
-FROM python:3.6
+FROM python:2.7
 MAINTAINER nnkwrik nnkwrik@gmail.com
 
 RUN pip install thrift

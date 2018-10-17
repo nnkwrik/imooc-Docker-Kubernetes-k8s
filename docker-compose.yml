@@ -1,0 +1,49 @@
+version: '3'
+
+services:
+  message-service:
+    image: message-service:latest
+
+  user-service:
+    image: user-service:latest
+    command:
+      - "--mysql.address=192.168.0.5"
+
+  user-edge-service:
+    image: user-edge-service:latest
+    links:
+      - user-service
+      - message-service
+    command:
+      - "--redis.address=192.168.0.5"
+
+# zookeeper原本也应该像mysql,redis那样用外部容器的方式运行,
+#但是这里用的dubbo-springboot不支持spring占位符, 无法把ip带入到properties,所以这里暂时把zk服务化
+  zookeeper:
+    image: zookeeper:3.5
+
+
+  course-service:
+    image: course-service:latest
+    links:
+      - user-service
+      - zookeeper
+    command:
+      - "--mysql.address=192.168.0.5"
+#      - "--zookeeper.address=192.168.0.5"
+
+  course-edge-service:
+    image: course-edge-service:latest
+    links:
+      - user-edge-service
+      - zookeeper
+#    command:
+#      - "--zookeeper.address=192.168.0.5"
+
+  api-gateway-zuul:
+    image: api-gateway-zuul:latest
+    links:
+      - user-edge-service
+      - course-edge-service
+    ports:
+      - 8080:8080

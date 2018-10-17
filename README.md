@@ -74,3 +74,35 @@ docker build -t user-service:lastest .
 docker run -it user-service:latest --mysql.address=192.168.0.5
 ```
 
+## docker-compose
+```bash
+docker-compose up -d
+docker-compose up -d message-service // 重启某个服务
+docker-compose down
+```
+## 镜像仓库
+公有仓库
+```bash
+docker tag zookeeper:3.5  nnkwrik/zookeeper:3.5
+docker login
+docker push nnkwrik/zookeeper:3.5
+docker pull nnkwrik/zookeeper:3.5
+```
+
+私有仓库
+
+没有交互界面, 多台生产环境时不容易管理
+```bash
+docker pull registry:2 
+docker run -d -p 5000:5000 registry:2 
+docker tag zookeeper:3.5 localhost:5000/zookeeper:3.5  
+docker push localhost:5000/zookeeper:3.5 
+docker pull localhost:5000/zookeeper:3.5
+```
+
+harbor
+
+改harbor.cfg,后 `sudo ./install.sh`
+```bash
+hostname = hub.nnkwrik.com
+```
