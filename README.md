@@ -120,3 +120,112 @@ docker tag openjdk:8-jre   hub.nnkwrik.co/micro-service/openjdk:8-jre
 docker push hub.nnkwrik.com/micro-service/openjdk:8-jre
 ```
 
+# Mesos
+
+![1539946544933](assets/1539946544933.png)
+
+搭建3个vm
+
+```
+192.168.0.6		server02
+192.168.0.4		server01
+192.168.0.7		server03
+192.168.0.5		host
+```
+
+
+
+```
+sudo apt-get install docker.io
+sudo apt-get install openssh-server
+```
+
+### server02(mesos master)
+
+```bash
+ubuntu@server02:~$ docker pull mesosphere/mesos-master:1.7.0
+sh mesos.sh
+```
+
+改hostname , vim /etc/hosts , 127.0.1.1   -->  192.168.0.6     server02
+
+mesos.sh(https://github.com/mesosphere/docker-containers/tree/master/mesos)
+
+```
+#!/bin/bash
+
+docker run -d --net=host \
+  -e MESOS_PORT=5050 \
+  -e MESOS_ZK=zk://192.168.0.5:2181/mesos \
+  -e MESOS_QUORUM=1 \
+  -e MESOS_REGISTRY=in_memory \
+  -e MESOS_LOG_DIR=/var/log/mesos \
+  -e MESOS_WORK_DIR=/var/tmp/mesos \
+  -v "$(pwd)/log/mesos:/var/log/mesos" \
+  -v "$(pwd)/work/mesos:/var/tmp/mesos" \
+  mesosphere/mesos-master:1.7.0
+```
+
+### server01/server03(mesos slave)
+
+```
+docker pull mesosphere/mesos-slave:1.7.0
+```
+
+同样改hostname , vim /etc/hosts
+
+mesos-slave.sh
+
+```
+#!/bin/bash
+
+docker run -d --net=host --privileged \
+  -e MESOS_PORT=5051 \
+  -e MESOS_MASTER=zk://192.168.0.5:2181/mesos \
+  -e MESOS_SWITCH_USER=0 \
+  -e MESOS_CONTAINERIZERS=docker,mesos \
+  -e MESOS_LOG_DIR=/var/log/mesos \
+  -e MESOS_WORK_DIR=/var/tmp/mesos \
+  -v "$(pwd)/log/mesos:/var/log/mesos" \
+  -v "$(pwd)/work/mesos:/var/tmp/mesos" \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /sys:/sys \
+  -v /usr/bin/docker:/usr/local/bin/docker \
+  mesosphere/mesos-slave:1.7.0 --no-systemd_enable_support
+
+```
+
+### server02(marathon)
+
+```
+docker pull mesosphere/marathon:v1.6.549
+```
+
+marathon.sh(https://hub.docker.com/r/mesosphere/marathon/)
+
+```bash
+#!/bin/bash
+
+docker run -d --net=host \
+ mesosphere/marathon:v1.6.549 \
+ --master zk://192.168.0.5:2181/mesos \
+ --zk zk://192.168.0.5:2181/marathon
+```
+
+### host(marathon lb)
+
+```
+docker pull mesosphere/marathon-lb:v1.12.3
+```
+
+start.sh
+
+```
+#!/bin/bash
+
+docker run -d -p 9090:9090 \
+ -e PORTS=9090 mesosphere/marathon-lb:v1.12.3 sse \
+ --group external \
+ --marathon http://192.168.0.6:8080
+```
+
