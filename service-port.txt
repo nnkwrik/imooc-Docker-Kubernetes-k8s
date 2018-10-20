@@ -1,0 +1,10 @@
+thrift.user.service=10001->7911
+thrift.message.service=10002->9090
+user.edge.service=10003->8084
+course.edge.service=10004->8081
+apigateway.service=10005->8080
+
+
+    "containerPort": 9090,
+    "protocol": "tcp",
+    "servicePort": 10002

@@ -73,7 +73,6 @@ public abstract class LoginFilter implements Filter {
         }
 
 
-
         login(request, response, userDTO);// 已登录的用户
 
         filterChain.doFilter(request, response);
@@ -81,10 +80,12 @@ public abstract class LoginFilter implements Filter {
 
     }
 
+    protected abstract String userEdgeServiceAddr();
+
     protected abstract void login(HttpServletRequest request, HttpServletResponse response, UserDTO userDTO);
 
     private UserDTO requestUserInfo(String token) {
-        String url = "http://user-edge-service:8084/user/authentication";
+        String url = "http://" + userEdgeServiceAddr() + "/user/authentication";
 
         HttpClient client = new DefaultHttpClient();
         HttpPost post = new HttpPost(url);

@@ -22,9 +22,8 @@ public class ServiceApplication {
     }
 
     @Bean
-    public FilterRegistrationBean filterRegistrationBean(){
+    public FilterRegistrationBean filterRegistrationBean(CourseFilter courseFilter){
         FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean();
-        CourseFilter courseFilter = new CourseFilter();
         filterRegistrationBean.setFilter(courseFilter);
         List<String> userPatterns = new ArrayList<>();
         userPatterns.add("/*");

@@ -120,6 +120,10 @@ docker tag openjdk:8-jre   hub.nnkwrik.co/micro-service/openjdk:8-jre
 docker push hub.nnkwrik.com/micro-service/openjdk:8-jre
 ```
 
+TODO
+
+- Docker-compose化后python的消息服务无法使用
+
 # Mesos
 
 ![1539946544933](assets/1539946544933.png)
@@ -164,6 +168,7 @@ docker run -d --net=host \
   -v "$(pwd)/log/mesos:/var/log/mesos" \
   -v "$(pwd)/work/mesos:/var/tmp/mesos" \
   mesosphere/mesos-master:1.7.0
+  --ip=192.168.0.6 --work_dir=/var/lib/mesos --hostname=192.168.0.6
 ```
 
 ### server01/server03(mesos slave)
@@ -192,7 +197,6 @@ docker run -d --net=host --privileged \
   -v /sys:/sys \
   -v /usr/bin/docker:/usr/local/bin/docker \
   mesosphere/mesos-slave:1.7.0 --no-systemd_enable_support
-
 ```
 
 ### server02(marathon)
@@ -228,4 +232,27 @@ docker run -d -p 9090:9090 \
  --group external \
  --marathon http://192.168.0.6:8080
 ```
+
+### 部署
+
+marathon,连接方式设为桥接,切换到Port, json mode修改成以下, 切换到Labels `HAPROXY_GROUP=external`
+
+    "portMappings": [
+      {
+        "containerPort": 9090,
+        "protocol": "tcp",
+        "servicePort": 10002
+      }
+此时部署出错,  在slave的/etc/docker/daemon.json添加harbor
+
+```
+{
+  "insecure-registries" : ["hub.nnkwrik.com"],
+  "dns" : ["192.168.0.6"]
+}
+```
+
+TODO
+
+- 用marathon分配到slave的服务,镜像每过几十秒就会重启, 
 
