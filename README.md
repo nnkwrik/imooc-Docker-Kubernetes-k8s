@@ -256,3 +256,200 @@ TODO
 
 - 用marathon分配到slave的服务,镜像每过几十秒就会重启, 
 
+## Docker Swarm
+
+搭建3个vm
+
+```
+192.168.0.6		server01
+192.168.0.4		server02
+192.168.0.7		server03
+192.168.0.5		host
+```
+
+### server01
+
+创建为manager
+
+```bash
+root@ubuntu:/home/ubuntu# docker swarm init --advertise-addr 192.168.0.06
+Swarm initialized: current node (j3dgiy8ao35641lyxerdwdp21) is now a manager.
+
+To add a worker to this swarm, run the following command:
+
+    docker swarm join \
+    --token SWMTKN-1-5x02lj77yb92idsrnzzg9c09ieie8to9yxf0k62gwmw4c19wjy-8m5dxordls6iw4vgpzt6mavj5 \
+    192.168.0.06:2377
+
+To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+```
+
+#### Server02/03,加入swarm
+
+```
+    docker swarm join \
+    --token SWMTKN-1-5x02lj77yb92idsrnzzg9c09ieie8to9yxf0k62gwmw4c19wjy-8m5dxordls6iw4vgpzt6mavj5 \
+    192.168.0.06:2377
+```
+
+### 让三个节点是SwarmNode的同时也是SwarmManager
+
+#### Server01
+
+```
+docker node ls #确认节点
+docker node promote server02	#升级为manager
+```
+
+### 创建服务
+
+```bash
+docker service create --name test1 alpine ping www.baidu.com
+docker service ls	#查看服务
+docker service inspect test1	#查看详细信息
+```
+
+```bash
+docker service create --name nginx nginx
+docker service update --publish-add 8080:80 nginx	#暴露端口
+#http://192.168.0.6:8080/,http://192.168.0.4:8080/,http://192.168.0.7:8080/ 都可访问
+```
+
+### 服务的高可用
+
+```bash
+docker service scale nginx=3
+docker service ls
+docker service ps nginx
+```
+
+以上是ingress网络
+
+### 自定义的网络
+
+```bash
+docker network create -d overlay imooc-overlay
+docker service create --network imooc-overlay --name nginx -p 8080:80 nginx
+docker service create --network imooc-overlay --name alpine alpine ping www.baidu.com
+docker service ls
+```
+
+自定义就能从alpine容器中`ping nginx`.ingress则不行,(mode = vip)
+
+此时,不仅能在外部通过ip访问,也能在服务间用服务名访问
+
+### dnsrr
+
+只需要通过名字在容器间访问时使用. 外部无法访问
+
+```bash
+docker service create --name nginx-b --endpoint-mode dnsrr nginx
+docker service update --network-add imooc-overlay nginx-b
+```
+
+```bash
+docker service ls
+docker service rm d8ufvhgsyb8g eln k7p #删掉目前的服务
+```
+
+### stack
+
+定义一个组,设置相互依赖的关系, 类似于compose
+
+server01, service.yml
+
+```yaml
+version: "3.4"
+services:
+  alpine:
+    image: alpine
+    command:
+      - "ping"
+      - "www.baidu.com"
+    networks:
+      - "imooc-overlay"
+    deploy:
+    # endpoint_mode: dnsrr
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+    depends_on:
+      - nginx
+
+  nginx:
+    image: nginx
+    networks:
+        - "imooc-overlay"
+    ports:
+        - "8080:80"
+
+networks:
+  imooc-overlay:
+    external: true
+```
+
+```bash
+docker stack deploy -c service.yml test
+docker stack ls	#确认
+docker stack services test
+docker service ls
+```
+
+### swarm微服务部署
+
+server01,创建swarm-service.yml
+
+```
+docker stack deploy -c swarm-service.yml ms
+```
+
+### 负载均衡
+
+让他能均衡访问三个vm中的api-gateway
+
+```bash
+#server01
+docker pull nginx
+docker run -idt -p 80:80 -v `pwd`/nginx.conf:/etc/nginx/conf.d/default.conf nginx
+```
+
+nginx.conf
+
+```
+upstream nnkwrik{
+    server 192.168.0.06:8080;
+    server 192.168.0.04:8080;
+    server 192.168.0.07:8080;
+}
+
+server {
+    listen       80;
+    server_name  www.nnkwrik.com;
+
+    #charset koi8-r;
+    #access_log  /var/log/nginx/host.access.log  main;
+
+    location / {
+        proxy_pass http://nnkwrik;
+    }
+
+    #error_page  404              /404.html;
+
+    # redirect server error pages to the static page /50x.html
+    #
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root   /usr/share/nginx/html;
+    }
+}
+```
+
+在host设置域名`192.168.0.6     www.nnkwrik.com`后,可从浏览器通过域名访问
+
+TODO
+
+- 能访问, 密码验证成功后不返回,导致Read timed out
