@@ -20,7 +20,10 @@
 ## API GATEWAY
 
 # Docker化
+[Ubuntu安装Docker ](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
+
 基本镜像
+
  ```bash
 docker pull openjdk:8-jre
 docker run -it --entrypoint bash openjdk:8-jre
@@ -419,7 +422,7 @@ docker run -idt -p 80:80 -v `pwd`/nginx.conf:/etc/nginx/conf.d/default.conf ngin
 
 nginx.conf
 
-```
+```bash
 upstream nnkwrik{
     server 192.168.0.06:8080;
     server 192.168.0.04:8080;
@@ -453,3 +456,284 @@ server {
 TODO
 
 - 能访问, 密码验证成功后不返回,导致Read timed out
+
+## k8s
+
+![1540082432627](assets/1540082432627.png)
+
+vm
+
+```
+192.168.0.6		server01	worker
+192.168.0.4		server02	master
+192.168.0.7		server03	worker
+192.168.0.5		host
+```
+
+环境搭建参考https://github.com/liuyi01/kubernetes-starter
+
+### 常用操作
+
+```bash
+#安装了kubectl的节点，这里为master节点
+$ kubectl version
+$ kubectl get nodes	#获取所有节点的信息
+$ kubectl get pods	
+```
+运行官方提供的示例
+```bash
+#运行官方提供的示例
+$ kubectl run kubernetes-bootcamp --image=jocatalin/kubernetes-bootcamp:v1 --port=8080
+$ kubectl get deploy	#查看当前该节点中所有的部署项
+$ kubectl get pods -o wide	#查看pod的详细信息
+#$ kubectl delete deploy kubernetes-bootcamp	#删除部署项
+```
+在worker中查看工作的pods
+```bash
+#部署成功后在相应的worker节点
+$ docker ps	#能查到被分配的部署项
+$ journalctl -f	#查看日志
+```
+
+获取详细信息
+```bash
+#安装了kubectl的节点，这里为master节点
+$ kubectl describe deploy kubernetes-bootcamp	#查看部署项的详细信息
+$ kubectl get pods
+$ kubectl describe pods kubernetes-bootcamp-6b7849c495-9w5dj	#查看pod的详细信息
+```
+
+如何访问部署的服务?
+```bash
+$ kubectl proxy	#开一个proxy
+Starting to serve on 127.0.0.1:8001
+#另外开一个bash ,用curl运行以下就能得到响应
+$ curl http://127.0.0.1:8001/api/v1/proxy/namespaces/default/pods/kubernetes-bootcamp-6b7849c495-9w5dj/
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-6b7849c495-9w5dj | v=1
+```
+
+扩缩容
+
+```bash
+$ kubectl scale
+$ kubectl scale deploy kubernetes-bootcamp --replicas=4
+$ kubectl get deploy	#此时数量已变成4
+$ kubectl get pods
+```
+
+更新镜像
+
+```bash
+#更新成v2(同样名字)
+$ kubectl set image deploy kubernetes-bootcamp kubernetes-bootcamp=jocatalin/kubernetes-bootcamp:v2
+#查看更新状态
+$ kubectl rollout status deploy kubernetes-bootcamp
+$ kubectl get deploy	#此时镜像已变成v2
+```
+
+撤回操作
+
+```bash
+#错误的镜像
+$ kubectl set image deploy kubernetes-bootcamp kubernetes-bootcamp=jocatalin/kubernetes-bootcamp:v20
+#回滚操作
+$ kubectl rollout undo deploy kubernetes-bootcamp
+```
+
+### 配置文件
+
+用配置文件也能统一管理,类似swarm
+
+- 创建一个pod
+
+nginx-pod.yaml
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.7.9
+      ports:
+        - containerPort: 80
+```
+
+```bash
+$ kubectl create -f nginx-pod.yaml	#创建
+$ kubectl get pods	#查看新建的nginx的pod
+$ kubectl get deploy	#查不到nginx,因为创建的是pod
+```
+
+尝试访问
+
+```bash
+$ kubectl proxy
+Starting to serve on 127.0.0.1:8001
+#另外开一个bash ,用curl运行以下能得到响应
+$ curl http://127.0.0.1:8001/api/v1/proxy/namespaces/default/pods/nginx/
+```
+
+- 创建一个deployment
+
+nginx-deployment.yaml
+
+```yaml
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.7.9
+        ports:
+          - containerPort: 80
+```
+
+```bash
+$ kubectl create -f nginx-deployment.yaml	#创建
+$ kubectl get deploy	#查看新建的nginx-deployments
+$ kubectl get pods -l app=nginx	#指定labels,查看pods. 会有两个
+```
+
+### Service (kube-proxy)
+
+```bash
+$ kubectl get services	#查看所有的服务, 
+$ kubectl describe service kubernetes	#查看详情
+```
+
+用kube-proxy访问service
+
+```bash
+$ kubectl expose deploy kubernetes-bootcamp --type="NodePort" --target-port=8080 --port=80
+$ kubectl get services	#此时能看到新添加的kubernetes-bootcamp
+NAME                  TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+kubernetes-bootcamp   NodePort    10.68.82.153   <none>        80:33353/TCP   24s
+#此时在worker上使用 netstat -ntlp|grep 33353 , 会看到处于监听状态
+```
+
+- 33353(node port) : 实际在worker节点上启动的端口, 这里是随机生成的
+- 8080(--target-port) : 容器实际监听的端口
+- 80(--port) : 在CLUSTER-IP(10.68.82.153)中实际访问时的端口
+
+从外部访问服务
+
+```bash
+$ curl 192.168.0.6:33353	#从外部访问worker的端口, 能返回结果
+$ curl 192.168.0.7:33353
+```
+
+从CLUSTER-IP访问 或从 pod的ip 访问,如
+
+```bash
+#在worker中,进入kubernetes-bootcamp的容器
+$ docker exec -it 22a848f7e511 bash
+$ curl 10.68.82.153:80	# CLUSTER-IP,服务的端口
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-7689dc585d-hn88d | v=2
+#甚至能访问别的pod
+#从有kubectl的节点使用 kubectl get pods -o wide, 查到nginx的pod的ip为172.20.40.197
+$ curl 172.20.40.197:80	#pod的ip,容器的端口
+```
+
+- 配置文件的方式创建
+
+能指定实际在节点上启动的端口(上次随机创建的是33353)
+
+nginx-service.yaml
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  ports:
+    - port: 8080
+      targetPort: 80
+      nodePort: 20000
+  selector:
+    app: nginx
+  type: NodePort
+```
+
+创建
+```bash
+$ kubectl create -f nginx-service.yaml
+$ kubectl get svc	#查看新创建的Service
+nginx-service         NodePort    10.68.177.199   <none>        8080:20000/TCP   1m
+
+$ curl 192.168.0.6:20000	#都能返回
+$ curl 192.168.0.7:20000
+```
+
+## kube-dns
+
+查看创建的kube-dns
+
+```bash
+$ kubectl -n kube-system get svc	#kube-system 内部的命名空间
+NAME       TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)         AGE
+kube-dns   ClusterIP   10.68.0.2    <none>        53/UDP,53/TCP   2m
+$ kubectl -n kube-system get pods
+NAME					 READY     STATUS    RESTARTS   AGE
+kube-dns-6c85d6648c-44qhb   3/3       Running   0          3m
+$ kubectl -n kube-system get pods -o wide
+NAME                        READY     STATUS    RESTARTS   AGE       IP             NODE
+kube-dns-6c85d6648c-44qhb   3/3       Running   0          4m        172.20.188.6   192.168.0.6
+```
+
+尝试访问
+
+```bash
+$ docker exec -it 22a848f7e511 bash	#进入boot-camp的容器
+$ curl nginx-service:8080	#可以访问, 8080是容器监听的端口
+$ curl 10.68.177.199:8080	#也是nginx-service,通过CLASTER-IP访问
+```
+
+可以看出dns就是把域名解析为CLASTER-IP
+
+### 其他指令 (需要配CA)
+
+```bash
+$ kubectl run kubernetes-bootcamp --image=jocatalin/kubernetes-bootcamp:v1 --port=8080
+$ kubectl logs kubernetes-bootcamp-6b7849c495-fml4j	#查看pod的日志
+$ kubectl exec -it kubernetes-bootcamp-6b7849c495-hbkbc bash	#进入容器
+```
+
+apply
+```bash
+$ kubectl apply -f nginx-pod.yaml	#类似create.但对于已存在的应用,apply是对其进行更新
+$ kubectl describe pod nginx	#Annotations部分和create不同
+# apply会把最近生成的配置内容记录到Annotations
+$ kubectl get pods nginx -o json	#查看完整的Annotations部分
+$ kubectl set image pods nginx nginx=nginx:1.7.9	#当然这样也能更新配置,但是Annotations部分还是原来的
+```
+
+总结访问方式
+
+```bash
+$ kubectl apply -f nginx-service.yaml
+$ kubectl apply -f nginx-deployment.yaml
+
+#从nodePort访问service
+$ curl  192.168.0.6:20000	
+$ curl  192.168.0.7:20000
+
+# 从CLUSTER-IP访问Service
+$ kubectl run busybox --rm=true --image=busybox --restart=Never --tty -i	#测试用的沙盒, ..用不了
+#通过进另一个容器的方式访问
+$ docker exec -it 4666249dac64 bash	#worker中的容器
+$ curl 10.68.15.126:8080	#ok
+$ curl nginx-service:8080	#ok.因为dns
+```
+
