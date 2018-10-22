@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-mvn clean clean package
+mvn clean package
 
 docker build -t hub.nnkwrik.com/micro-service/user-edge-service:latest .
 

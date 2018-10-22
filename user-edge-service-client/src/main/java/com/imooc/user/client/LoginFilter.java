@@ -68,7 +68,7 @@ public abstract class LoginFilter implements Filter {
         }
 
         if (userDTO == null) {
-            response.sendRedirect("http://0.0.0.0:8080/user/login");
+            response.sendRedirect("http://192.168.0.6/user/login");
             return;
         }
 

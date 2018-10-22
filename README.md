@@ -261,6 +261,8 @@ TODO
 
 # Docker Swarm
 
+![1540184406331](assets/1540184406331.png)
+
 搭建3个vm
 
 ```
@@ -452,8 +454,6 @@ server {
 ```
 
 在host设置域名`192.168.0.6     www.nnkwrik.com`后,可从浏览器通过域名访问
-
-
 
 # k8s
 
@@ -776,5 +776,47 @@ http://192.168.0.7/course/courseList
 
 TODO
 
-- 消息服务依然有问题,
-- dubbo获取不到provider, 导致空指针异常
+- 消息服务依然有问题
+
+# CICD
+
+![1540168384633](assets/1540168384633.png)
+
+
+
+## 环境搭建
+
+GitLab环境搭建参考 [GitLab安装、使用教程（Docker版）](https://github.com/liuyi01/imooc-docs/blob/master/gitlab-install.md)
+
+### 搭建Jenkins
+
+参考[官方文档](https://jenkins.io/doc/pipeline/tour/getting-started/)下载到有kubectl和jdk8,mvn,git的机器里(server02)
+
+```bash
+$ apt-get install maven
+$ apt-get install git
+$ java -jar jenkins.war --httpPort=8888	#此时会显示密码, 我这里是e417de0badc249038bcf1ca4b69fd6d1
+```
+
+浏览器访问http://192.168.0.4:8888 , 输入刚才给的密码.选择`选择插件来安装`.Pipelines and Continuous Delivery的部分都勾上.安装
+
+### webhook
+
+gitlab : setting里的Integrations中有webhook.绑定事件, 当时间发生时会产生webhook
+
+Jenkins创建任务user-edge-service,选`流水线`构建. 之后里面有个`构建触发器`,选`触发远程构建`随便写一个令牌(123456).
+
+Jenkins/系统管理/全局安全配置,`授权策略中的匿名用户具有可读权限`勾上,`防止跨站点请求伪造`勾取消掉
+
+回到gitlab在gitlab的url中写入 `http://192.168.0.4:8888/job/user-edge-service/build?token=123456`.此时gitlab报错`Requests to the local network are not allowed`,根据[文档](https://docs.gitlab.com/ee/security/webhooks.html)进行配置.
+
+git的webhook设置中可以测试push event,此时返回201说明配置成功
+
+### Jenkins部署
+
+jenkins点开已创建的任务(user-edge-service)/配置,在流水线中可以设定触发的脚本, 保存后直接在jenkins中点立即构建就可以
+
+Jenkins的流水线脚本示例在jenkins/下
+
+
+
