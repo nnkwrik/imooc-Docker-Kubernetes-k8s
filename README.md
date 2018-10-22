@@ -251,7 +251,7 @@ marathon,连接方式设为桥接,切换到Port, json mode修改成以下, 切�
 ```
 {
   "insecure-registries" : ["hub.nnkwrik.com"],
-  "dns" : ["192.168.0.6"]
+  "dns" : ["192.168.0.6"]	#看情况加
 }
 ```
 
@@ -259,7 +259,7 @@ TODO
 
 - 用marathon分配到slave的服务,镜像每过几十秒就会重启, 
 
-## Docker Swarm
+# Docker Swarm
 
 搭建3个vm
 
@@ -453,11 +453,9 @@ server {
 
 在host设置域名`192.168.0.6     www.nnkwrik.com`后,可从浏览器通过域名访问
 
-TODO
 
-- 能访问, 密码验证成功后不返回,导致Read timed out
 
-## k8s
+# k8s
 
 ![1540082432627](assets/1540082432627.png)
 
@@ -676,7 +674,7 @@ $ curl 192.168.0.6:20000	#都能返回
 $ curl 192.168.0.7:20000
 ```
 
-## kube-dns
+### kube-dns
 
 查看创建的kube-dns
 
@@ -702,8 +700,9 @@ $ curl 10.68.177.199:8080	#也是nginx-service,通过CLASTER-IP访问
 
 可以看出dns就是把域名解析为CLASTER-IP
 
-### 其他指令 (需要配CA)
+### 其他指令 
 
+需要配CA
 ```bash
 $ kubectl run kubernetes-bootcamp --image=jocatalin/kubernetes-bootcamp:v1 --port=8080
 $ kubectl logs kubernetes-bootcamp-6b7849c495-fml4j	#查看pod的日志
@@ -737,3 +736,45 @@ $ curl 10.68.15.126:8080	#ok
 $ curl nginx-service:8080	#ok.因为dns
 ```
 
+### 服务添加到k8s
+
+在worker节点添加harbor
+
+```bash
+{
+  "insecure-registries" : ["hub.nnkwrik.com"]
+}
+```
+
+master节点,启动服务
+
+```bash
+$ kubectl apply -f message-service.yaml
+$ kubectl apply -f user-service.yaml
+$ kubectl apply -f course-service.yaml
+$ kubectl apply -f api-gateway.yaml	#此时报错, 说port得是20000-40000
+```
+
+修改端口限制
+
+```bash
+$ vi /lib/systemd/system/kube-apiserver.service
+#  把 --service-node-port-range=20000-40000 \ 改成 80-40000
+$ systemctl daemon-reload	#重启
+$ service kube-apiserver restart
+$ kubectl apply -f api-gateway.yaml	#ok
+```
+
+浏览器访问
+
+```
+http://192.168.0.7/course/courseList
+http://192.168.0.7/course/courseList
+```
+
+:smile:
+
+TODO
+
+- 消息服务依然有问题,
+- dubbo获取不到provider, 导致空指针异常
